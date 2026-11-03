@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 231 55% 23%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 220 20% 96%;
+    --secondary-foreground: 231 45% 20%;
+    --muted: 220 18% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 233 40% 94%;
+    --accent-foreground: 231 55% 25%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 60% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 30 40% 12%;
+    --border: 220 16% 90%;
+    --input: 220 16% 88%;
+    --ring: 231 55% 35%;
+    --radius: 0.75rem;
+    --font-sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui,
+      -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: "Sora", "Segoe UI Variable Display", "Segoe UI", system-ui,
+      sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+  }
+
+  .dark {
+    --background: 231 35% 8%;
+    --foreground: 210 30% 96%;
+    --card: 231 30% 11%;
+    --card-foreground: 210 30% 96%;
+    --popover: 231 30% 11%;
+    --popover-foreground: 210 30% 96%;
+    --primary: 233 70% 70%;
+    --primary-foreground: 231 45% 12%;
+    --secondary: 231 24% 17%;
+    --secondary-foreground: 210 30% 96%;
+    --muted: 231 24% 16%;
+    --muted-foreground: 220 12% 65%;
+    --accent: 231 30% 20%;
+    --accent-foreground: 210 30% 96%;
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 55% 48%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 30 40% 10%;
+    --border: 231 22% 20%;
+    --input: 231 22% 22%;
+    --ring: 233 60% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    @apply bg-primary/15 text-foreground;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-xl border bg-card shadow-card;
+  }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .stat-value {
+    @apply font-display text-2xl font-semibold tracking-tight sm:text-3xl;
+  }
+
+  .table-shell {
+    @apply overflow-hidden rounded-xl border bg-card shadow-card;
+  }
+
+  .data-table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .data-table thead th {
+    @apply whitespace-nowrap border-b bg-muted/50 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+
+  .data-table tbody td {
+    @apply border-b px-4 py-3 align-middle last:border-b-0;
+  }
+
+  .data-table tbody tr {
+    @apply transition-colors hover:bg-muted/40;
+  }
+
+  .field-label {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .hero-grid {
+    background-image: linear-gradient(
+        to right,
+        hsl(var(--border) / 0.55) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, hsl(var(--border) / 0.55) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 55%, transparent 100%);
+  }
+
+  .scanner-frame {
+    position: relative;
+  }
+
+  .scanner-frame::before,
+  .scanner-frame::after {
+    content: "";
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-color: hsl(var(--primary));
+    border-style: solid;
+    z-index: 2;
+  }
+
+  .scanner-frame::before {
+    top: 0;
+    left: 0;
+    border-width: 3px 0 0 3px;
+    border-top-left-radius: 14px;
+  }
+
+  .scanner-frame::after {
+    bottom: 0;
+    right: 0;
+    border-width: 0 3px 3px 0;
+    border-bottom-right-radius: 14px;
+  }
+
+  .scan-overlay-line {
+    @apply pointer-events-none absolute inset-x-8 top-0 h-0.5 animate-scan-line bg-primary/80;
+    box-shadow: 0 0 16px 2px hsl(var(--primary) / 0.6);
+  }
+
+  .noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+}
