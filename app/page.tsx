@@ -345,7 +345,7 @@ export default function LandingPage() {
 
         {/* Offline */}
         <section id="offline" className="py-20 sm:py-24">
-          <div className="page-shell grid gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="page-shell grid gap-12 lg:grid-cols-2 lg:items-start">
             <div>
               <Badge variant="muted" className="mb-4">Offline-first, honestly labelled</Badge>
               <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">

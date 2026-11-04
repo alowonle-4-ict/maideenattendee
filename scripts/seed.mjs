@@ -73,7 +73,8 @@ const admin = createClient(url, serviceKey, {
 
 const SUPER_ADMIN_EMAIL =
   process.env.SUPER_ADMIN_EMAIL ?? "superadmin@maideenattendee.app";
-const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD ?? "ChangeMe123!";
+const SUPER_ADMIN_PASSWORD =
+  process.env.SUPER_ADMIN_PASSWORD || randomBytes(12).toString("base64url");
 const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? "Demo#Maideen2026";
 
 function must(result, label) {

@@ -27,20 +27,17 @@ you run the commands above against it.
 
 | Account | Email | Password |
 | --- | --- | --- |
-| Super admin (platform owner) | `superadmin@maideenattendee.app` | `ChangeMe123!` |
 | Every institution admin, lecturer and student | see tables below | `Demo#Maideen2026` |
 
-Override the defaults at seed time with `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` and
-`SEED_PASSWORD`. If you override them, the values in this file no longer apply.
+Override the demo password at seed time with `SEED_PASSWORD`. If you override it, the
+values in this file no longer apply.
 
 ## Super admin
 
-Signs in at `/login` and lands on `/platform`. Manages institutions, plans, subscriptions,
-support tickets, audit log and platform settings.
-
-| Name | Email | Password |
-| --- | --- | --- |
-| Platform super admin | `superadmin@maideenattendee.app` | `ChangeMe123!` |
+**Not published.** The platform owner account is provisioned privately and is never listed
+in this repository. The seed creates it from `SUPER_ADMIN_EMAIL` and
+`SUPER_ADMIN_PASSWORD`, generating a random password when `SUPER_ADMIN_PASSWORD` is unset,
+and prints the result once to the terminal. Signs in at `/login` and lands on `/platform`.
 
 ## Maideen Demo University (`maideen-demo`)
 
