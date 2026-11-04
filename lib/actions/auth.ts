@@ -53,11 +53,20 @@ export async function signIn(
     };
   }
 
-  const { data: roleRow } = await supabase
+  const { data: roleRow, error: roleError } = await supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", data.user.id)
     .maybeSingle();
+
+  if (roleError) {
+    await supabase.auth.signOut();
+    return {
+      ok: false,
+      message:
+        "We couldn't load your account permissions. Please try again in a moment. If it keeps happening, contact your administrator.",
+    };
+  }
 
   if (!roleRow?.role) {
     await supabase.auth.signOut();
@@ -68,11 +77,20 @@ export async function signIn(
     };
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("is_active, institution_id")
     .eq("id", data.user.id)
     .maybeSingle();
+
+  if (profileError) {
+    await supabase.auth.signOut();
+    return {
+      ok: false,
+      message:
+        "We couldn't verify your account status. Please try again in a moment.",
+    };
+  }
 
   if (profile && profile.is_active === false) {
     await supabase.auth.signOut();
@@ -80,11 +98,21 @@ export async function signIn(
   }
 
   if (roleRow.role !== "super_admin" && profile) {
-    const { data: institution } = await supabase
+    const { data: institution, error: institutionError } = await supabase
       .from("institutions")
       .select("status")
       .eq("id", profile.institution_id)
       .maybeSingle();
+
+    if (institutionError) {
+      await supabase.auth.signOut();
+      return {
+        ok: false,
+        message:
+          "We couldn't verify your institution's status. Please try again in a moment.",
+      };
+    }
+
     if (institution?.status === "suspended" || institution?.status === "deleted") {
       await supabase.auth.signOut();
       return {

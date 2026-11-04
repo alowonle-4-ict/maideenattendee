@@ -14,15 +14,22 @@ export async function GET(request: Request) {
 
     if (!user) return NextResponse.redirect(`${origin}/login`);
 
-    const { data: roleRow } = await supabase
+    const { data: roleRow, error } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const role = roleRow?.role as AppRole | undefined;
-    return NextResponse.redirect(`${origin}${role ? ROLE_HOME[role] : "/login"}`);
+    const role = !error && roleRow?.role ? (roleRow.role as AppRole) : null;
+    const home = role ? ROLE_HOME[role] : undefined;
+    if (home) return NextResponse.redirect(`${origin}${home}`);
+
+    // Clear the session so middleware stops treating this as a signed-in user.
+    await supabase.auth.signOut();
+    return NextResponse.redirect(
+      `${origin}/login?notice=${error ? "auth_unavailable" : "no_role"}`
+    );
   } catch {
-    return NextResponse.redirect(`${origin}/login`);
+    return NextResponse.redirect(`${origin}/login?notice=auth_unavailable`);
   }
 }

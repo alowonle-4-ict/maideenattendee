@@ -56,12 +56,34 @@ function isPublic(pathname: string) {
   );
 }
 
+function loginWithNotice(request: NextRequest, notice: string) {
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  url.searchParams.set("notice", notice);
+  return NextResponse.redirect(url);
+}
+
+function isAuthOutage(
+  error: { name?: string; message?: string; status?: number } | null
+) {
+  if (!error) return false;
+  return (
+    error.name === "AuthRetryableFetchError" ||
+    (error.status ?? 0) >= 500 ||
+    /invalid api key/i.test(error.message ?? "")
+  );
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   if (!isSupabaseConfigured()) {
     return response;
   }
+
+  const pathname = request.nextUrl.pathname;
+  const guarded = ROUTE_ROLES.find((route) => pathname.startsWith(route.prefix));
 
   const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
     cookies: {
@@ -82,42 +104,71 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
-  const guarded = ROUTE_ROLES.find((route) => pathname.startsWith(route.prefix));
+    if (isAuthOutage(authError)) {
+      return guarded ? loginWithNotice(request, "auth_unavailable") : response;
+    }
 
-  if (!user) {
-    if (guarded) {
+    if (!user) {
+      if (guarded) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/login";
+        url.search = "";
+        url.searchParams.set("next", pathname);
+        return NextResponse.redirect(url);
+      }
+      return response;
+    }
+
+    // Only bounce away from /login when the account actually has a role. A stale
+    // session without a user_roles row would otherwise loop /login -> /auth/redirect.
+    if (pathname === "/login" || pathname === "/register") {
+      const { data: roleRow, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const role = !error && roleRow?.role ? (roleRow.role as AppRole) : null;
+      if (!role) return response;
+
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", pathname);
+      url.pathname = homeForRole(role);
+      url.search = "";
       return NextResponse.redirect(url);
+    }
+
+    if (guarded) {
+      const { data: roleRow, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const role = !error && roleRow?.role ? (roleRow.role as AppRole) : null;
+
+      if (!role) {
+        return loginWithNotice(request, error ? "auth_unavailable" : "no_role");
+      }
+
+      if (!guarded.roles.includes(role)) {
+        const url = request.nextUrl.clone();
+        url.pathname = homeForRole(role);
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
+
+    return response;
+  } catch {
+    if (guarded) {
+      return loginWithNotice(request, "auth_unavailable");
     }
     return response;
   }
-
-  if (pathname === "/login" || pathname === "/register") {
-    return NextResponse.redirect(new URL("/auth/redirect", request.url));
-  }
-
-  if (guarded) {
-    const { data: roleRow } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const role = (roleRow?.role as AppRole | undefined) ?? null;
-
-    if (!role || !guarded.roles.includes(role)) {
-      const url = request.nextUrl.clone();
-      url.pathname = role ? homeForRole(role) : "/login";
-      return NextResponse.redirect(url);
-    }
-  }
-
-  return response;
 }
