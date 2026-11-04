@@ -2,27 +2,30 @@ project_id = "maideenattendee"
 
 [api]
 enabled = true
-port = 54321
+port = 54331
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-port = 54322
-shadow_port = 54320
-major_version = 15
+port = 54332
+shadow_port = 54330
+major_version = 17
 
 [db.pooler]
 enabled = false
 
+[db.seed]
+enabled = false
+
 [studio]
 enabled = true
-port = 54323
+port = 54333
 api_url = "http://127.0.0.1"
 
-[inbucket]
+[local_smtp]
 enabled = true
-port = 54324
+port = 54334
 
 [storage]
 enabled = true
@@ -40,7 +43,7 @@ enable_signup = true
 enable_confirmations = false
 
 [auth.email]
-enable_signup = true
+enabled = true
 double_confirm_changes = true
 enable_confirmations = false
 
