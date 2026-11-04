@@ -125,11 +125,18 @@ export function ImportCourseStudentsDialog({
                 All three columns are required for new students. Existing matric numbers
                 are matched and enrolled using their current password.
               </p>
-              <Button asChild type="button" variant="outline" size="sm" className="mt-2">
-                <a href="/api/templates/course-students">
-                  <Download /> Download Excel template
-                </a>
-              </Button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button asChild type="button" variant="outline" size="sm">
+                  <a href="/api/templates/course-students">
+                    <Download /> Blank Excel template
+                  </a>
+                </Button>
+                <Button asChild type="button" variant="ghost" size="sm">
+                  <a href="/templates/course-students-sample.xlsx" download>
+                    <Download /> Sample with data
+                  </a>
+                </Button>
+              </div>
             </div>
 
             {state.message && !state.ok && (

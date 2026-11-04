@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Building2, Globe2, HeartHandshake, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -15,17 +16,29 @@ export default function AboutPage() {
       <SiteHeader />
       <main className="flex-1">
         <section className="border-b bg-muted/20 py-16 sm:py-20">
-          <div className="page-shell max-w-3xl">
-            <Badge variant="muted" className="mb-4">About MaideenAttendee</Badge>
-            <h1 className="text-balance font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Attendance records that universities can defend
-            </h1>
-            <p className="mt-5 text-pretty text-muted-foreground">
-              MaideenAttendee was built around a simple observation: attendance is
-              evidence. It decides eligibility for examinations, informs
-              accreditation visits, and protects students from administrative
-              error. It deserves infrastructure, not a shared spreadsheet.
-            </p>
+          <div className="page-shell grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div>
+              <Badge variant="muted" className="mb-4">About MaideenAttendee</Badge>
+              <h1 className="text-balance font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+                Attendance records that universities can defend
+              </h1>
+              <p className="mt-5 text-pretty text-muted-foreground">
+                MaideenAttendee was built around a simple observation: attendance is
+                evidence. It decides eligibility for examinations, informs
+                accreditation visits, and protects students from administrative
+                error. It deserves infrastructure, not a shared spreadsheet.
+              </p>
+            </div>
+            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border shadow-soft">
+              <Image
+                src="/images/campus-scan.webp"
+                alt="A lecturer scanning a student's QR code at a Nigerian university lecture hall"
+                fill
+                priority
+                sizes="(min-width: 1024px) 40vw, 100vw"
+                className="object-cover"
+              />
+            </div>
           </div>
         </section>
 

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, QrCode, ShieldCheck, WifiOff } from "lucide-react";
 
@@ -11,6 +12,16 @@ export default function AuthLayout({
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
+        <Image
+          src="/images/lecture-hall.webp"
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1024px) 52vw, 100vw"
+          className="object-cover"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/95 via-primary/85 to-primary" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary via-primary/20 to-primary/60" />
         <div className="noise pointer-events-none absolute inset-0 opacity-60" />
         <div className="pointer-events-none absolute -right-24 top-1/4 h-80 w-80 rounded-full bg-brand-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/5 blur-2xl" />

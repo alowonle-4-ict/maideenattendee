@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -42,19 +43,31 @@ export default function FeaturesPage() {
       <SiteHeader />
       <main className="flex-1">
         <section className="border-b bg-muted/20 py-16 sm:py-20">
-          <div className="page-shell max-w-3xl">
-            <Badge variant="muted" className="mb-4">Features</Badge>
-            <h1 className="text-balance font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              A scanning workflow that holds up in a hall of 500
-            </h1>
-            <p className="mt-5 text-pretty text-muted-foreground">
-              Every button in MaideenAttendee writes to a real database through
-              a validated server path. Nothing is simulated, and no scan is
-              confirmed until the server has accepted it.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Button asChild><Link href="/register">Start free trial <ArrowRight /></Link></Button>
-              <Button asChild variant="outline"><Link href="/pricing">See pricing</Link></Button>
+          <div className="page-shell grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div>
+              <Badge variant="muted" className="mb-4">Features</Badge>
+              <h1 className="text-balance font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+                A scanning workflow that holds up in a hall of 500
+              </h1>
+              <p className="mt-5 text-pretty text-muted-foreground">
+                Every button in MaideenAttendee writes to a real database through
+                a validated server path. Nothing is simulated, and no scan is
+                confirmed until the server has accepted it.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Button asChild><Link href="/register">Start free trial <ArrowRight /></Link></Button>
+                <Button asChild variant="outline"><Link href="/pricing">See pricing</Link></Button>
+              </div>
+            </div>
+            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border shadow-soft">
+              <Image
+                src="/images/qr-checkin.webp"
+                alt="A lecturer scanning a student's permanent QR code with a phone"
+                fill
+                priority
+                sizes="(min-width: 1024px) 40vw, 100vw"
+                className="object-cover"
+              />
             </div>
           </div>
         </section>

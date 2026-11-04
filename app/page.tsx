@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -284,7 +285,16 @@ export default function LandingPage() {
                   Import your existing student list, assign courses, and start
                   scanning the same week. No hardware. No bespoke integration.
                 </p>
-                <div className="mt-8 space-y-4 rounded-xl border bg-card p-5 shadow-card">
+                <div className="relative mt-8 aspect-[4/3] overflow-hidden rounded-2xl border shadow-soft">
+                  <Image
+                    src="/images/campus-scan.webp"
+                    alt="A lecturer scanning a student's QR code at the entrance to a lecture hall"
+                    fill
+                    sizes="(min-width: 1024px) 34vw, 100vw"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="mt-4 space-y-4 rounded-xl border bg-card p-5 shadow-card">
                   <div className="flex items-center gap-3">
                     <Zap className="h-5 w-5 text-warning" />
                     <div>
@@ -366,9 +376,25 @@ export default function LandingPage() {
                 </Link>
               </Button>
             </div>
-            <div className="rounded-2xl border bg-card p-6 shadow-soft">
-              <div className="flex items-center justify-between">
-                <p className="font-display text-sm font-semibold">Sync status</p>
+            <div className="space-y-4">
+              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border shadow-soft">
+                <Image
+                  src="/images/qr-checkin.webp"
+                  alt="A student's permanent QR card being scanned by a lecturer's phone"
+                  fill
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  className="object-cover"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent p-5">
+                  <p className="text-sm font-semibold text-white">Scan at the door, not on paper</p>
+                  <p className="mt-1 text-xs text-white/75">
+                    The student&apos;s permanent QR is checked against the live session before it counts.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-card p-6 shadow-soft">
+                <div className="flex items-center justify-between">
+                  <p className="font-display text-sm font-semibold">Sync status</p>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning">
                   <WifiOff className="h-3 w-3" /> Offline
                 </span>
@@ -401,6 +427,7 @@ export default function LandingPage() {
                   Records stay provisionally recorded until the server accepts them.
                   Failed uploads are never silently discarded.
                 </p>
+                </div>
               </div>
             </div>
           </div>

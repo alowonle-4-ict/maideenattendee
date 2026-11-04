@@ -27,6 +27,15 @@ export default async function ScanPage({ params }: { params: Promise<{ id: strin
 
   if (!session || session.lecturer_id !== ctx.user.id) notFound();
 
+  const { data: assignment } = await supabase
+    .from("course_lecturers")
+    .select("id")
+    .eq("course_id", session.course_id)
+    .eq("lecturer_id", ctx.user.id)
+    .maybeSingle();
+
+  if (!assignment) notFound();
+
   const [{ data: registrations }, { data: records }, { data: settings }] = await Promise.all([
     supabase
       .from("course_registrations")

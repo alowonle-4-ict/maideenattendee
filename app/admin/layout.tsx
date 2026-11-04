@@ -12,7 +12,7 @@ export default async function AdminLayout({
   const supabase = await createClient();
   const { data: institution } = await supabase
     .from("institutions")
-    .select("name")
+    .select("name, logo_url")
     .eq("id", ctx.institutionId)
     .maybeSingle();
 
@@ -26,6 +26,7 @@ export default async function AdminLayout({
         avatarUrl: ctx.profile?.avatar_url,
       }}
       institutionName={institution?.name ?? "Institution"}
+      institutionLogoUrl={institution?.logo_url ?? null}
       groups={NAVIGATION.institution_admin}
       profileHref="/admin/settings"
     >

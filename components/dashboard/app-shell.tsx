@@ -63,6 +63,7 @@ export function AppShell({
   roleLabel,
   user,
   institutionName,
+  institutionLogoUrl,
   groups,
   profileHref,
   children,
@@ -71,6 +72,7 @@ export function AppShell({
   roleLabel: string;
   user: { fullName: string; email: string; avatarUrl?: string | null };
   institutionName?: string | null;
+  institutionLogoUrl?: string | null;
   groups: NavGroup[];
   profileHref: string;
   children: React.ReactNode;
@@ -167,11 +169,21 @@ export function AppShell({
               <Menu className="h-5 w-5" />
             </Button>
 
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">
-                {institutionName ?? "Platform administration"}
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">{roleLabel}</p>
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              {institutionLogoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={institutionLogoUrl}
+                  alt={`${institutionName ?? "Institution"} logo`}
+                  className="h-9 w-9 shrink-0 rounded-lg border bg-white object-contain p-1"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {institutionName ?? "Platform administration"}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">{roleLabel}</p>
+              </div>
             </div>
 
             <button

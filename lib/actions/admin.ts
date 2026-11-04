@@ -874,6 +874,111 @@ export async function updateInstitutionSettings(
 }
 
 /* ------------------------------------------------------------------ */
+/* Institution branding                                                */
+/* ------------------------------------------------------------------ */
+function imageType(bytes: Uint8Array): { ext: "png" | "jpg" | "webp"; mime: string } | null {
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return { ext: "png", mime: "image/png" };
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { ext: "jpg", mime: "image/jpeg" };
+  }
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { ext: "webp", mime: "image/webp" };
+  }
+  return null;
+}
+
+export async function updateInstitutionLogo(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const { institutionId } = await requireInstitution();
+  const admin = createAdminClient();
+  const bucket = admin.storage.from("institution-assets");
+
+  if (formData.get("intent") === "remove") {
+    await bucket.remove([
+      `${institutionId}/logo.png`,
+      `${institutionId}/logo.jpg`,
+      `${institutionId}/logo.webp`,
+    ]);
+    const { error } = await admin
+      .from("institutions")
+      .update({ logo_url: null })
+      .eq("id", institutionId);
+    if (error) return fail(error.message);
+
+    await audit("institution_logo_removed", "institution", institutionId);
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin", "layout");
+    revalidatePath("/lecturer", "layout");
+    revalidatePath("/student", "layout");
+    return ok("Institution logo removed.");
+  }
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) {
+    return fail("Choose a PNG, JPEG or WebP image to upload.");
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    return fail("Logo is too large. Maximum size is 2 MB.");
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = imageType(bytes);
+  if (!type) {
+    return fail("Unsupported image. Upload a PNG, JPEG or WebP file.");
+  }
+
+  const path = `${institutionId}/logo.${type.ext}`;
+  const { error: uploadError } = await bucket.upload(path, bytes, {
+    contentType: type.mime,
+    upsert: true,
+    cacheControl: "3600",
+  });
+
+  if (uploadError) {
+    if (/bucket.*not found|not found/i.test(uploadError.message)) {
+      return fail(
+        "Logo storage is not configured. Apply supabase/migrations/20260101000300_storage_branding.sql, then try again."
+      );
+    }
+    return fail(uploadError.message);
+  }
+
+  const { data: urlData } = bucket.getPublicUrl(path);
+  const logoUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+  const { error } = await admin
+    .from("institutions")
+    .update({ logo_url: logoUrl })
+    .eq("id", institutionId);
+  if (error) return fail(error.message);
+
+  await bucket.remove(
+    (["png", "jpg", "webp"] as const)
+      .filter((ext) => ext !== type.ext)
+      .map((ext) => `${institutionId}/logo.${ext}`)
+  );
+
+  await audit("institution_logo_updated", "institution", institutionId);
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin", "layout");
+  revalidatePath("/lecturer", "layout");
+  revalidatePath("/student", "layout");
+  return ok("Institution logo updated.");
+}
+
+/* ------------------------------------------------------------------ */
 /* Bulk import                                                         */
 /* ------------------------------------------------------------------ */
 export async function importStudentsAction(

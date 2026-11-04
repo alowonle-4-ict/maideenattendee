@@ -1,3 +1,4 @@
+import { InstitutionLogoForm } from "@/components/admin/institution-logo-form";
 import { InstitutionSettingsForm } from "@/components/admin/institution-settings-form";
 import { PageHeader, SectionCard } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,14 @@ export default async function AdminSettingsPage() {
         title="Institution settings"
         description="Configure attendance rules and institutional preferences. Changes apply to future scans."
       />
+
+      <SectionCard
+        title="Institution logo"
+        description="Shown in the dashboard header for your administrators, lecturers and students."
+        className="mb-6"
+      >
+        <InstitutionLogoForm logoUrl={institution?.logo_url ?? null} />
+      </SectionCard>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

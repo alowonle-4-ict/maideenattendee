@@ -12,7 +12,7 @@ export default async function StudentLayout({
   const supabase = await createClient();
   const { data: institution } = await supabase
     .from("institutions")
-    .select("name")
+    .select("name, logo_url")
     .eq("id", ctx.institutionId ?? "")
     .maybeSingle();
 
@@ -26,6 +26,7 @@ export default async function StudentLayout({
         avatarUrl: ctx.profile?.avatar_url,
       }}
       institutionName={institution?.name ?? "Institution"}
+      institutionLogoUrl={institution?.logo_url ?? null}
       groups={NAVIGATION.student}
       profileHref="/student/profile"
     >

@@ -117,13 +117,22 @@ export function ImportStudentsDialog() {
                 full_name, matric_number, email, phone, department_code, password
               </p>
               <p className="mt-1">Only full_name and matric_number are required.</p>
-              <button
-                type="button"
-                onClick={downloadTemplate}
-                className="mt-2 inline-flex items-center gap-1 font-medium text-brand-600 hover:underline dark:text-brand-400"
-              >
-                <Download className="h-3 w-3" /> Download CSV template
-              </button>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <a
+                  href="/templates/students-import-sample.xlsx"
+                  download
+                  className="inline-flex items-center gap-1 font-medium text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  <Download className="h-3 w-3" /> Sample Excel workbook
+                </a>
+                <button
+                  type="button"
+                  onClick={downloadTemplate}
+                  className="inline-flex items-center gap-1 font-medium text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  <Download className="h-3 w-3" /> CSV template
+                </button>
+              </div>
             </div>
 
             {state.message && !state.ok && (
