@@ -798,24 +798,49 @@ export async function registerStudents(
   if (studentIds.length === 0) return fail("Select at least one student.");
 
   const supabase = await createClient();
-  const rows = studentIds.map((studentId) => ({
-    institution_id: institutionId,
-    course_id: courseId,
-    student_id: studentId,
-    academic_session_id: academicSessionId,
-  }));
 
-  const { error } = await supabase.from("course_registrations").upsert(rows, {
-    onConflict: academicSessionId
-      ? "course_id,student_id,academic_session_id"
-      : "course_id,student_id",
-    ignoreDuplicates: true,
-  });
-  if (error) return fail(error.message);
-  await audit("students_registered", "course", courseId, { count: studentIds.length });
+  // PostgREST cannot infer the partial unique index used for session-less
+  // registrations, so existing rows are filtered here and the indexes stay the guard.
+  let existingQuery = supabase
+    .from("course_registrations")
+    .select("student_id")
+    .eq("institution_id", institutionId)
+    .eq("course_id", courseId)
+    .in("student_id", studentIds);
+  existingQuery = academicSessionId
+    ? existingQuery.eq("academic_session_id", academicSessionId)
+    : existingQuery.is("academic_session_id", null);
+
+  const { data: existing, error: existingError } = await existingQuery;
+  if (existingError) return fail(existingError.message);
+
+  const alreadyRegistered = new Set((existing ?? []).map((row) => row.student_id as string));
+  const rows = studentIds
+    .filter((studentId) => !alreadyRegistered.has(studentId))
+    .map((studentId) => ({
+      institution_id: institutionId,
+      course_id: courseId,
+      student_id: studentId,
+      academic_session_id: academicSessionId,
+    }));
+
+  if (rows.length === 0) {
+    return ok("Every selected student is already registered for this course.");
+  }
+
+  const { error } = await supabase.from("course_registrations").insert(rows);
+  if (error) {
+    return fail(
+      error.code === "23505"
+        ? "Some students were registered by another request. Refresh the list and try again."
+        : error.message
+    );
+  }
+
+  await audit("students_registered", "course", courseId, { count: rows.length });
   revalidatePath("/admin/registrations");
   revalidatePath("/admin/courses");
-  return ok(`${studentIds.length} registration${studentIds.length === 1 ? "" : "s"} processed.`);
+  return ok(`${rows.length} registration${rows.length === 1 ? "" : "s"} processed.`);
 }
 
 export async function removeRegistration(id: string): Promise<ActionState> {
