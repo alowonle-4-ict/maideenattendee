@@ -48,7 +48,7 @@ export default async function StudentCourseDetailPage({ params }: PageProps) {
   const { data: registration } = await supabase
     .from("course_registrations")
     .select(
-      "id, semester:semesters(name), course:courses(id, code, title, description, credit_units, level, department:departments(name))"
+      "id, course:courses(id, code, title, description, credit_units, level, department:departments(name), semester:semesters(name))"
     )
     .eq("student_id", ctx.user.id)
     .eq("course_id", id)
@@ -65,8 +65,9 @@ export default async function StudentCourseDetailPage({ params }: PageProps) {
     credit_units: number;
     level: string | null;
     department: { name: string } | null;
+    semester: { name: string } | null;
   };
-  const semester = registration.semester as unknown as { name: string } | null;
+  const semester = course.semester;
 
   const [{ data: sessions }, { data: records }, { data: summary }, { data: settings }] =
     await Promise.all([

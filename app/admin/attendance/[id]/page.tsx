@@ -64,7 +64,9 @@ export default async function AdminSessionDetailPage({ params }: { params: Promi
       .order("scanned_at"),
   ]);
 
-  const roster = ((rosterData ?? []) as RosterRow[]).slice().sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const roster = ((rosterData as { roster?: RosterRow[] } | null)?.roster ?? [])
+    .slice()
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
   const registered = roster.length;
   const present = roster.filter((row) => row.present).length;
   const absent = registered - present;
