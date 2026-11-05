@@ -66,6 +66,7 @@ export async function getGatewayAvailability(): Promise<GatewayAvailability[]> {
       enabled: flags[gateway],
       missing,
       source: secrets[gateway].source,
+      keyMode: secrets[gateway].keyMode,
     };
   });
 }

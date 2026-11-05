@@ -6,7 +6,9 @@ export const env = {
   supabaseAnonKey: anonKey,
   appUrl: process.env.APP_URL ?? "http://localhost:3000",
   paystackSecret: process.env.PAYSTACK_SECRET_KEY ?? "",
+  paystackPublic: process.env.PAYSTACK_PUBLIC_KEY ?? "",
   flutterwaveSecret: process.env.FLUTTERWAVE_SECRET_KEY ?? "",
+  flutterwavePublic: process.env.FLUTTERWAVE_PUBLIC_KEY ?? "",
   flutterwaveHash: process.env.FLUTTERWAVE_SECRET_HASH ?? "",
   serviceRole: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
 };

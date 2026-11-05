@@ -8,6 +8,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   GATEWAY_CREDENTIALS_SETTINGS_KEY,
   clearGatewayStoredCredentials,
+  detectKeyMode,
+  resolveGatewaySecrets,
   saveGatewayCredentialValues,
 } from "@/lib/secrets/gateways";
 import type { ActionState } from "@/lib/actions/admin";
@@ -385,28 +387,50 @@ export async function setGatewayEnabled(
   };
 }
 
+const TOO_LONG = "Credential is unexpectedly long \u2014 check what you pasted";
+
 const credentialsSchema = z.object({
   gateway: z.enum(["paystack", "flutterwave"]),
-  secret_key: z.string().trim().max(400, "Credential is unexpectedly long \u2014 check what you pasted"),
-  secret_hash: z.string().trim().max(400, "Credential is unexpectedly long \u2014 check what you pasted"),
+  secret_key: z.string().trim().max(400, TOO_LONG),
+  secret_hash: z.string().trim().max(400, TOO_LONG),
+  public_key: z.string().trim().max(400, TOO_LONG),
 });
 
+type CredentialValues = { secret_key: string; secret_hash: string; public_key: string };
+
+/** Rejects the mistake that actually happens: pasting the other key into the box. */
 function credentialFieldErrors(
   gateway: GatewayName,
-  values: { secret_key: string; secret_hash: string }
+  values: CredentialValues
 ): Record<string, string> {
   const errors: Record<string, string> = {};
+
   if (gateway === "paystack") {
     if (values.secret_key && !/^sk_(test|live)_/.test(values.secret_key)) {
       errors.secret_key =
         "A Paystack secret key starts with sk_test_ or sk_live_ (from Keys & Webhooks, not the public keys tab).";
     }
-  } else {
-    if (values.secret_key && /^FLWPUB/i.test(values.secret_key)) {
-      errors.secret_key = "That looks like the public key. Paste the secret key instead.";
+    if (values.public_key) {
+      if (/^sk_/.test(values.public_key)) {
+        errors.public_key = "That looks like the secret key. Paste the public key instead.";
+      } else if (!/^pk_(test|live)_/.test(values.public_key)) {
+        errors.public_key = "A Paystack public key starts with pk_test_ or pk_live_.";
+      }
     }
-    if (values.secret_hash && values.secret_hash.length < 6) {
-      errors.secret_hash = "Enter the verification hash you configured for the Flutterwave webhook.";
+    return errors;
+  }
+
+  if (values.secret_key && /^FLWPUB/i.test(values.secret_key)) {
+    errors.secret_key = "That looks like the public key. Paste the secret key instead.";
+  }
+  if (values.secret_hash && values.secret_hash.length < 6) {
+    errors.secret_hash = "Enter the verification hash you configured for the Flutterwave webhook.";
+  }
+  if (values.public_key) {
+    if (/^FLWSECK/i.test(values.public_key)) {
+      errors.public_key = "That looks like the secret key. Paste the public key instead.";
+    } else if (!/^FLWPUBK([-_]TEST)?[-_]/i.test(values.public_key)) {
+      errors.public_key = "A Flutterwave public key starts with FLWPUBK- or FLWPUBK_TEST-.";
     }
   }
   return errors;
@@ -423,10 +447,12 @@ export async function saveGatewayCredentials(
     return { ok: false, message: "Unsupported payment gateway." };
   }
 
+  const read = (field: string) => (formData.get(field) as string | null) ?? "";
   const parsed = credentialsSchema.safeParse({
     gateway,
-    secret_key: (formData.get("secret_key") as string | null) ?? "",
-    secret_hash: (formData.get("secret_hash") as string | null) ?? "",
+    secret_key: read("secret_key"),
+    secret_hash: read("secret_hash"),
+    public_key: read("public_key"),
   });
   if (!parsed.success) {
     return {
@@ -443,9 +469,27 @@ export async function saveGatewayCredentials(
     return { ok: false, message: "Check the credentials.", fieldErrors };
   }
 
+  // A blank field keeps the credential on file, so the pair is checked against
+  // the value that will actually be in use after this save.
+  const secrets = await resolveGatewaySecrets();
+  const effectiveSecret = parsed.data.secret_key || secrets[gateway].secretKey;
+  const effectivePublic = parsed.data.public_key || secrets[gateway].publicKey;
+  const secretMode = detectKeyMode(gateway, [effectiveSecret]);
+  const publicMode = detectKeyMode(gateway, [effectivePublic]);
+  if (secretMode !== "unknown" && publicMode !== "unknown" && secretMode !== publicMode) {
+    return {
+      ok: false,
+      message: "Check the credentials.",
+      fieldErrors: {
+        public_key: `This is a ${publicMode} public key but the secret key in use is ${secretMode}. They belong to different accounts.`,
+      },
+    };
+  }
+
   const supplied: Record<string, string> = {};
   if (parsed.data.secret_key) supplied.secret_key = parsed.data.secret_key;
   if (parsed.data.secret_hash) supplied.secret_hash = parsed.data.secret_hash;
+  if (parsed.data.public_key) supplied.public_key = parsed.data.public_key;
 
   if (Object.keys(supplied).length === 0) {
     return { ok: false, message: "Nothing to save \u2014 every field was left blank." };
@@ -458,6 +502,7 @@ export async function saveGatewayCredentials(
     gateway,
     fields: Object.keys(supplied),
     key_prefix: parsed.data.secret_key.slice(0, 8),
+    public_key_prefix: parsed.data.public_key.slice(0, 11),
   });
 
   revalidatePath("/platform/gateways");
@@ -466,7 +511,7 @@ export async function saveGatewayCredentials(
   revalidatePath("/admin/subscription");
   return {
     ok: true,
-    message: `${gateway === "paystack" ? "Paystack" : "Flutterwave"} credentials saved and encrypted on the server.`,
+    message: `${gateway === "paystack" ? "Paystack" : "Flutterwave"} credentials saved. Secret keys are encrypted on the server.`,
   };
 }
 

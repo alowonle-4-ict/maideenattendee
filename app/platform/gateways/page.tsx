@@ -84,7 +84,7 @@ export default async function PlatformGatewaysPage() {
       <PageHeader
         eyebrow="Revenue"
         title="Payment gateways"
-        description="Enter gateway API keys here or control which gateways institutions can use. Keys are encrypted before they are stored, never displayed again, and only ever read by the server when talking to the gateway."
+        description="Enter gateway API keys here or control which gateways institutions can use. Secret keys and webhook hashes are encrypted before they are stored, are never displayed again, and are only read by the server when talking to the gateway. Public keys are not secrets, so they stay readable."
         actions={<GatewayRefreshButton />}
       />
 
@@ -132,6 +132,11 @@ export default async function PlatformGatewaysPage() {
                 <Badge variant={gateway.configured ? "success" : "destructive"}>
                   {gateway.configured ? "Credentials ready" : "Missing credentials"}
                 </Badge>
+                {gateway.keyMode !== "unknown" && (
+                  <Badge variant={gateway.keyMode === "test" ? "warning" : "info"}>
+                    {gateway.keyMode === "test" ? "Test keys \u2014 no real money" : "Live keys"}
+                  </Badge>
+                )}
                 {gateway.configured && (
                   <Badge variant="muted">
                     {gateway.source === "stored"
@@ -158,8 +163,8 @@ export default async function PlatformGatewaysPage() {
                 <p className="text-sm font-medium">API keys</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {gateway.gateway === "paystack"
-                    ? "Paystack Dashboard \u2192 Settings \u2192 Developers \u2192 API Keys & Webhooks."
-                    : "Flutterwave Dashboard \u2192 Settings \u2192 API \u2014 the webhook verification hash is set under Webhooks."}
+                    ? "Paystack Dashboard \u2192 Settings \u2192 API Keys & Webhooks. The public key and secret key sit on different tabs \u2014 checkout only needs the secret key."
+                    : "Flutterwave Dashboard \u2192 Settings \u2192 API \u2014 the public and secret keys are listed there; the webhook verification hash is set under Webhooks."}
                 </p>
                 <div className="mt-3">
                   <GatewayCredentialsForm

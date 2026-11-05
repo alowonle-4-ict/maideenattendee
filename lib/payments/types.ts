@@ -32,6 +32,8 @@ export interface VerifiedPayment {
 
 export type GatewayCredentialSource = "stored" | "environment" | "none";
 
+export type GatewayKeyMode = "test" | "live" | "unknown";
+
 export interface GatewayAvailability {
   gateway: GatewayName;
   label: string;
@@ -39,6 +41,7 @@ export interface GatewayAvailability {
   enabled: boolean;
   missing: string[];
   source: GatewayCredentialSource;
+  keyMode: GatewayKeyMode;
 }
 
 export class PaymentGatewayError extends Error {

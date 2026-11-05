@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/admin/copy-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,12 +18,18 @@ import type { GatewayCredentialSummary } from "@/lib/secrets/gateways";
 import type { GatewayName } from "@/lib/payments/types";
 
 const PLACEHOLDERS: Record<string, Record<string, string>> = {
-  paystack: { secret_key: "sk_live_... or sk_test_..." },
+  paystack: {
+    secret_key: "sk_live_... or sk_test_...",
+    public_key: "pk_live_... or pk_test_...",
+  },
   flutterwave: {
     secret_key: "FLWSECK-... or FLWSECK_TEST-...",
     secret_hash: "The hash you set in the Flutterwave dashboard",
+    public_key: "FLWPUBK-... or FLWPUBK_TEST-...",
   },
 };
+
+const OPTIONAL_NOTE = "Optional. Redirect checkout uses the secret key only.";
 
 export function GatewayCredentialsForm({
   gateway,
@@ -87,31 +94,60 @@ export function GatewayCredentialsForm({
         {summary.fields.map((field) => (
           <div key={field.field} className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor={`${gateway}-${field.field}`}>{field.label}</Label>
-              <Badge variant={field.source === "stored" ? "success" : field.source === "environment" ? "muted" : "outline"}>
+              <Label htmlFor={`${gateway}-${field.field}`}>
+                {field.label}
+                {!field.secret && (
+                  <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                    optional
+                  </span>
+                )}
+              </Label>
+              <Badge
+                variant={
+                  field.source === "stored"
+                    ? "success"
+                    : field.source === "environment"
+                      ? "muted"
+                      : "outline"
+                }
+              >
                 {field.source === "stored"
-                  ? `Stored ${field.masked}`
+                  ? field.secret
+                    ? `Stored ${field.preview}`
+                    : "Stored"
                   : field.source === "environment"
-                    ? `Env ${field.masked}`
+                    ? field.secret
+                      ? `Env ${field.preview}`
+                      : "From environment"
                     : "Not set"}
               </Badge>
             </div>
             <Input
               id={`${gateway}-${field.field}`}
               name={field.field}
-              type="password"
+              type={field.secret ? "password" : "text"}
               autoComplete="off"
               spellCheck={false}
               placeholder={PLACEHOLDERS[gateway][field.field]}
             />
             {state.fieldErrors?.[field.field] ? (
               <p className="text-[11px] text-destructive">{state.fieldErrors[field.field]}</p>
+            ) : field.source !== "none" ? (
+              <p className="text-[11px] text-muted-foreground">
+                Leave blank to keep the current value.
+              </p>
             ) : (
-              field.source !== "none" && (
-                <p className="text-[11px] text-muted-foreground">
-                  Leave blank to keep the current value.
-                </p>
+              !field.secret && (
+                <p className="text-[11px] text-muted-foreground">{OPTIONAL_NOTE}</p>
               )
+            )}
+            {!field.secret && field.source !== "none" && field.preview && (
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 break-all rounded bg-muted/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                  {field.preview}
+                </code>
+                <CopyButton value={field.preview} label="Copy key" />
+              </div>
             )}
           </div>
         ))}

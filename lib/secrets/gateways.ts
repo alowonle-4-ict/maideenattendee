@@ -8,7 +8,7 @@ import {
   maskSecret,
   secretsEncryptionConfigured,
 } from "@/lib/secrets/crypto";
-import type { GatewayName } from "@/lib/payments/types";
+import type { GatewayKeyMode, GatewayName } from "@/lib/payments/types";
 
 export const GATEWAY_CREDENTIALS_SETTINGS_KEY = "payment_gateway_credentials";
 
@@ -20,7 +20,9 @@ export type CredentialSource = "stored" | "environment" | "none";
 export interface GatewayCredentialField {
   field: string;
   label: string;
-  masked: string;
+  secret: boolean;
+  /** Masked for secret fields, shown in full otherwise. Empty when unset. */
+  preview: string;
   source: CredentialSource;
 }
 
@@ -32,14 +34,51 @@ export interface GatewayCredentialSummary {
 }
 
 export interface ResolvedGatewaySecrets {
-  paystack: { secretKey: string; source: CredentialSource };
-  flutterwave: { secretKey: string; secretHash: string; source: CredentialSource };
+  paystack: { secretKey: string; publicKey: string; keyMode: GatewayKeyMode; source: CredentialSource };
+  flutterwave: {
+    secretKey: string;
+    secretHash: string;
+    publicKey: string;
+    keyMode: GatewayKeyMode;
+    source: CredentialSource;
+  };
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  secret_key: "Secret key",
-  secret_hash: "Webhook secret hash",
+interface CredentialFieldSpec {
+  field: string;
+  label: string;
+  /** Secret fields are encrypted at rest and masked in the dashboard. */
+  secret: boolean;
+  environment: () => string;
+}
+
+const CREDENTIAL_FIELDS: Record<GatewayName, CredentialFieldSpec[]> = {
+  paystack: [
+    { field: "secret_key", label: "Secret key", secret: true, environment: () => env.paystackSecret },
+    { field: "public_key", label: "Public key", secret: false, environment: () => env.paystackPublic },
+  ],
+  flutterwave: [
+    { field: "secret_key", label: "Secret key", secret: true, environment: () => env.flutterwaveSecret },
+    { field: "secret_hash", label: "Webhook secret hash", secret: true, environment: () => env.flutterwaveHash },
+    { field: "public_key", label: "Public key", secret: false, environment: () => env.flutterwavePublic },
+  ],
 };
+
+/**
+ * A test key is always reported as test, even when only one half of the pair is
+ * known, so the dashboard can never claim live keys by accident.
+ */
+export function detectKeyMode(gateway: GatewayName, keys: string[]): GatewayKeyMode {
+  const values = keys.map((value) => (value ?? "").trim()).filter(Boolean);
+  if (gateway === "paystack") {
+    if (values.some((value) => /^(sk|pk)_test_/i.test(value))) return "test";
+    if (values.some((value) => /^(sk|pk)_live_/i.test(value))) return "live";
+    return "unknown";
+  }
+  if (values.some((value) => /^flw(seck|pubk)[-_]test/i.test(value))) return "test";
+  if (values.some((value) => /^flw(seck|pubk)[-_]/i.test(value))) return "live";
+  return "unknown";
+}
 
 async function readStoredRow(): Promise<StoredRow> {
   try {
@@ -55,15 +94,20 @@ async function readStoredRow(): Promise<StoredRow> {
   }
 }
 
-function pick(
+function readField(
   entry: StoredEntry | undefined,
-  field: string,
-  fallback: string
+  spec: CredentialFieldSpec
 ): { value: string; source: CredentialSource } {
-  const stored = decryptSecret(entry?.[field]);
+  const raw = entry?.[spec.field];
+  const stored = spec.secret ? decryptSecret(raw) : (raw ?? null);
   if (stored) return { value: stored, source: "stored" };
+  const fallback = spec.environment();
   if (fallback) return { value: fallback, source: "environment" };
   return { value: "", source: "none" };
+}
+
+function valuesFor(gateway: GatewayName, entry: StoredEntry | undefined) {
+  return CREDENTIAL_FIELDS[gateway].map((spec) => ({ spec, ...readField(entry, spec) }));
 }
 
 /**
@@ -72,62 +116,57 @@ function pick(
  */
 export async function resolveGatewaySecrets(): Promise<ResolvedGatewaySecrets> {
   const row = await readStoredRow();
-  const paystack = row.paystack;
-  const flutterwave = row.flutterwave;
+  const paystack = valuesFor("paystack", row.paystack);
+  const flutterwave = valuesFor("flutterwave", row.flutterwave);
 
-  const paystackSecret = pick(paystack, "secret_key", env.paystackSecret);
-  const flutterwaveSecret = pick(flutterwave, "secret_key", env.flutterwaveSecret);
-  const flutterwaveHash = pick(flutterwave, "secret_hash", env.flutterwaveHash);
+  const get = (fields: ReturnType<typeof valuesFor>, field: string) =>
+    fields.find((item) => item.spec.field === field);
+
+  const paystackSecret = get(paystack, "secret_key")!;
+  const paystackPublic = get(paystack, "public_key")!;
+  const flutterwaveSecret = get(flutterwave, "secret_key")!;
+  const flutterwaveHash = get(flutterwave, "secret_hash")!;
+  const flutterwavePublic = get(flutterwave, "public_key")!;
 
   return {
     paystack: {
       secretKey: paystackSecret.value,
+      publicKey: paystackPublic.value,
+      keyMode: detectKeyMode("paystack", [paystackSecret.value, paystackPublic.value]),
       source: paystackSecret.source,
     },
     flutterwave: {
       secretKey: flutterwaveSecret.value,
       secretHash: flutterwaveHash.value,
+      publicKey: flutterwavePublic.value,
+      keyMode: detectKeyMode("flutterwave", [
+        flutterwaveSecret.value,
+        flutterwavePublic.value,
+      ]),
       source: flutterwaveSecret.source,
     },
   };
 }
 
-/** Masked view for the platform dashboard. Never returns a plaintext secret. */
+/** Dashboard view of every credential. Secret fields are never returned in plaintext. */
 export async function getGatewayCredentialSummaries(): Promise<GatewayCredentialSummary[]> {
   const row = await readStoredRow();
 
-  const build = (
-    gateway: GatewayName,
-    entry: StoredEntry | undefined,
-    fields: Array<[string, string]>
-  ): GatewayCredentialSummary => {
-    const summary: GatewayCredentialSummary = {
+  return (["paystack", "flutterwave"] as GatewayName[]).map((gateway) => {
+    const fields = valuesFor(gateway, row[gateway]);
+    return {
       gateway,
-      updatedAt: entry?.updated_at ?? null,
-      fields: fields.map(([field, fallback]) => {
-        const resolved = pick(entry, field, fallback);
-        return {
-          field,
-          label: FIELD_LABELS[field] ?? field,
-          masked: resolved.value ? maskSecret(resolved.value) : "",
-          source: resolved.source,
-        };
-      }),
-      secretSource:
-        fields
-          .map(([field, fallback]) => pick(entry, field, fallback).source)
-          .find((source) => source !== "none") ?? "none",
+      updatedAt: row[gateway]?.updated_at ?? null,
+      fields: fields.map(({ spec, value, source }) => ({
+        field: spec.field,
+        label: spec.label,
+        secret: spec.secret,
+        preview: value ? (spec.secret ? maskSecret(value) : value) : "",
+        source,
+      })),
+      secretSource: fields.map((f) => f.source).find((source) => source !== "none") ?? "none",
     };
-    return summary;
-  };
-
-  return [
-    build("paystack", row.paystack, [["secret_key", env.paystackSecret]]),
-    build("flutterwave", row.flutterwave, [
-      ["secret_key", env.flutterwaveSecret],
-      ["secret_hash", env.flutterwaveHash],
-    ]),
-  ];
+  });
 }
 
 /**
@@ -146,6 +185,8 @@ export async function saveGatewayCredentialValues(
     };
   }
 
+  const specs = new Map(CREDENTIAL_FIELDS[gateway].map((spec) => [spec.field, spec]));
+
   const admin = createAdminClient();
   const { data: current, error: readError } = await admin
     .from("platform_settings")
@@ -160,9 +201,11 @@ export async function saveGatewayCredentialValues(
 
   let changed = 0;
   for (const [field, value] of Object.entries(values)) {
+    const spec = specs.get(field);
+    if (!spec) continue;
     const trimmed = value?.trim() ?? "";
     if (!trimmed) continue;
-    entry[field] = encryptSecret(trimmed);
+    entry[field] = spec.secret ? encryptSecret(trimmed) : trimmed;
     changed += 1;
   }
 
