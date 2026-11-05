@@ -30,12 +30,15 @@ export interface VerifiedPayment {
   raw: unknown;
 }
 
+export type GatewayCredentialSource = "stored" | "environment" | "none";
+
 export interface GatewayAvailability {
   gateway: GatewayName;
   label: string;
   configured: boolean;
   enabled: boolean;
   missing: string[];
+  source: GatewayCredentialSource;
 }
 
 export class PaymentGatewayError extends Error {

@@ -2,7 +2,7 @@ import "server-only";
 
 import { timingSafeEqual } from "crypto";
 
-import { env } from "@/lib/env";
+import { resolveGatewaySecrets } from "@/lib/secrets/gateways";
 import {
   PaymentGatewayError,
   type GatewayPaymentState,
@@ -19,20 +19,26 @@ interface FlutterwaveResponse<T> {
   data: T;
 }
 
-async function flutterwaveRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!env.flutterwaveSecret) {
+async function flutterwaveSecretKey(): Promise<string> {
+  const { flutterwave } = await resolveGatewaySecrets();
+  if (!flutterwave.secretKey) {
     throw new PaymentGatewayError(
-      "Flutterwave is not configured. Set FLUTTERWAVE_SECRET_KEY on the server.",
+      "Flutterwave is not configured. Add the secret key under Platform \u2192 Payment gateways, or set FLUTTERWAVE_SECRET_KEY on the server.",
       "flutterwave"
     );
   }
+  return flutterwave.secretKey;
+}
+
+async function flutterwaveRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const secretKey = await flutterwaveSecretKey();
 
   let response: Response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${env.flutterwaveSecret}`,
+        Authorization: `Bearer ${secretKey}`,
         "Content-Type": "application/json",
         ...(init?.headers ?? {}),
       },
@@ -76,9 +82,11 @@ function mapState(status?: string): GatewayPaymentState {
   }
 }
 
-export function isFlutterwaveSignatureValid(signature: string | null) {
-  if (!env.flutterwaveHash || !signature) return false;
-  const expected = Buffer.from(env.flutterwaveHash);
+export async function isFlutterwaveSignatureValid(signature: string | null) {
+  if (!signature) return false;
+  const { flutterwave } = await resolveGatewaySecrets();
+  if (!flutterwave.secretHash) return false;
+  const expected = Buffer.from(flutterwave.secretHash);
   const received = Buffer.from(signature);
   if (expected.length !== received.length) return false;
   try {

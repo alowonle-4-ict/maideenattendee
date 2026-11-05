@@ -8,6 +8,7 @@ import {
 
 import { CopyButton } from "@/components/admin/copy-button";
 import { PageHeader, SectionCard, StatCard } from "@/components/dashboard/page-header";
+import { GatewayCredentialsForm } from "@/components/platform/gateway-credentials-form";
 import { GatewayRefreshButton, GatewayToggle } from "@/components/platform/gateway-toggle";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,6 +22,8 @@ import {
 import { requireAuth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { getGatewayAvailability } from "@/lib/payments";
+import { getGatewayCredentialSummaries } from "@/lib/secrets/gateways";
+import { secretsEncryptionConfigured } from "@/lib/secrets/crypto";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, relativeTime } from "@/lib/utils";
 
@@ -39,8 +42,9 @@ export default async function PlatformGatewaysPage() {
   await requireAuth(["super_admin"]);
   const supabase = await createClient();
 
-  const [gateways, { data: events }] = await Promise.all([
+  const [gateways, credentialSummaries, { data: events }] = await Promise.all([
     getGatewayAvailability(),
+    getGatewayCredentialSummaries(),
     supabase
       .from("payment_webhook_events")
       .select(
@@ -50,6 +54,8 @@ export default async function PlatformGatewaysPage() {
       .limit(25),
   ]);
 
+  const summaries = new Map(credentialSummaries.map((row) => [row.gateway, row]));
+  const encryptionReady = secretsEncryptionConfigured();
   const webhookRows = (events ?? []) as unknown as WebhookRow[];
   const configuredCount = gateways.filter((gateway) => gateway.configured).length;
   const enabledCount = gateways.filter((gateway) => gateway.enabled).length;
@@ -59,12 +65,12 @@ export default async function PlatformGatewaysPage() {
     {
       label: "Paystack webhook",
       url: `${env.appUrl}/api/webhooks/paystack`,
-      note: "Set this as the Paystack webhook URL. Requests are validated with the PAYSTACK_SECRET_KEY HMAC signature.",
+      note: "Set this as the Paystack webhook URL. Requests are validated with an HMAC signature computed from the Paystack secret key.",
     },
     {
       label: "Flutterwave webhook",
       url: `${env.appUrl}/api/webhooks/flutterwave`,
-      note: "Set this as the Flutterwave webhook URL and use FLUTTERWAVE_SECRET_HASH as the secret hash.",
+      note: "Set this as the Flutterwave webhook URL and use the same value for the webhook verification hash you save above.",
     },
     {
       label: "Checkout callback",
@@ -78,7 +84,7 @@ export default async function PlatformGatewaysPage() {
       <PageHeader
         eyebrow="Revenue"
         title="Payment gateways"
-        description="Control which gateways institutions can use. Enabling a gateway does not replace server credentials — checkout still refuses to start if keys are missing."
+        description="Enter gateway API keys here or control which gateways institutions can use. Keys are encrypted before they are stored, never displayed again, and only ever read by the server when talking to the gateway."
         actions={<GatewayRefreshButton />}
       />
 
@@ -86,7 +92,7 @@ export default async function PlatformGatewaysPage() {
         <StatCard
           label="Configured"
           value={`${configuredCount} / ${gateways.length}`}
-          hint="Server credentials present"
+          hint="Secret keys available to the server"
           icon={ShieldCheck}
           tone={configuredCount === gateways.length ? "success" : "warning"}
         />
@@ -124,8 +130,15 @@ export default async function PlatformGatewaysPage() {
                   {gateway.enabled ? "Enabled" : "Disabled"}
                 </Badge>
                 <Badge variant={gateway.configured ? "success" : "destructive"}>
-                  {gateway.configured ? "Credentials configured" : "Missing credentials"}
+                  {gateway.configured ? "Credentials ready" : "Missing credentials"}
                 </Badge>
+                {gateway.configured && (
+                  <Badge variant="muted">
+                    {gateway.source === "stored"
+                      ? "Keys from this dashboard"
+                      : "Keys from environment variables"}
+                  </Badge>
+                )}
               </div>
 
               {!gateway.configured && (
@@ -135,11 +148,34 @@ export default async function PlatformGatewaysPage() {
                     Checkout is blocked for {gateway.label}
                   </p>
                   <p className="mt-1">
-                    Add these server-side environment variables, then redeploy:{" "}
-                    <code className="font-mono">{gateway.missing.join(", ")}</code>.
+                    Enter the {gateway.missing.join(" and ")} below, or set the matching
+                    environment variables and redeploy.
                   </p>
                 </div>
               )}
+
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm font-medium">API keys</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {gateway.gateway === "paystack"
+                    ? "Paystack Dashboard \u2192 Settings \u2192 Developers \u2192 API Keys & Webhooks."
+                    : "Flutterwave Dashboard \u2192 Settings \u2192 API \u2014 the webhook verification hash is set under Webhooks."}
+                </p>
+                <div className="mt-3">
+                  <GatewayCredentialsForm
+                    gateway={gateway.gateway}
+                    summary={
+                      summaries.get(gateway.gateway) ?? {
+                        gateway: gateway.gateway,
+                        updatedAt: null,
+                        fields: [],
+                        secretSource: "none",
+                      }
+                    }
+                    encryptionReady={encryptionReady}
+                  />
+                </div>
+              </div>
 
               <ul className="space-y-2 text-xs text-muted-foreground">
                 <li className="flex items-start gap-2">

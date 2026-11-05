@@ -135,9 +135,8 @@ export default async function AdminBillingPage({ searchParams }: PageProps) {
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            No payment gateway is configured on this deployment. Set the required server variables
-            (for example PAYSTACK_SECRET_KEY, or FLUTTERWAVE_SECRET_KEY and FLUTTERWAVE_SECRET_HASH)
-            before attempting a subscription payment. No payment will be simulated.
+            No payment gateway has credentials on this deployment. Ask the platform owner to enter
+            them under Platform &rarr; Payment gateways. No payment will be simulated.
           </p>
         </div>
       )}

@@ -7,12 +7,9 @@ import { ProfileForm } from "@/components/profile/profile-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth";
-import {
-  isFlutterwaveConfigured,
-  isPaystackConfigured,
-  isSupabaseConfigured,
-} from "@/lib/env";
-import { getGatewayFlags } from "@/lib/payments";
+import { isSupabaseConfigured } from "@/lib/env";
+import { getGatewayAvailability } from "@/lib/payments";
+import { secretsEncryptionConfigured } from "@/lib/secrets/crypto";
 import { createClient } from "@/lib/supabase/server";
 
 type PlatformSettingRow = { key: string; value: Record<string, unknown> };
@@ -21,9 +18,9 @@ export default async function PlatformSettingsPage() {
   const ctx = await requireAuth(["super_admin"]);
   const supabase = await createClient();
 
-  const [{ data: settings }, flags] = await Promise.all([
+  const [{ data: settings }, gateways] = await Promise.all([
     supabase.from("platform_settings").select("key, value"),
-    getGatewayFlags(),
+    getGatewayAvailability(),
   ]);
 
   const rows = (settings ?? []) as unknown as PlatformSettingRow[];
@@ -36,12 +33,15 @@ export default async function PlatformSettingsPage() {
     typeof supportValue === "string" ? supportValue : "support@maideenattendee.app";
 
   const serviceRoleConfigured = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const paystack = gateways.find((gateway) => gateway.gateway === "paystack");
+  const flutterwave = gateways.find((gateway) => gateway.gateway === "flutterwave");
 
   const checks = [
     { label: "Supabase URL and anon key", ok: isSupabaseConfigured() },
     { label: "Supabase service role key", ok: serviceRoleConfigured },
-    { label: "Paystack secret key", ok: isPaystackConfigured() },
-    { label: "Flutterwave keys and hash", ok: isFlutterwaveConfigured() },
+    { label: "Credential encryption key", ok: secretsEncryptionConfigured() },
+    { label: "Paystack secret key", ok: Boolean(paystack?.configured) },
+    { label: "Flutterwave secret key and hash", ok: Boolean(flutterwave?.configured) },
   ];
 
   return (
@@ -68,8 +68,8 @@ export default async function PlatformSettingsPage() {
           <PlatformSettingsForm
             trialDays={trialDays}
             supportEmail={supportEmail}
-            paystackEnabled={flags.paystack}
-            flutterwaveEnabled={flags.flutterwave}
+            paystackEnabled={paystack?.enabled ?? true}
+            flutterwaveEnabled={flutterwave?.enabled ?? true}
           />
         </SectionCard>
 
@@ -96,12 +96,14 @@ export default async function PlatformSettingsPage() {
 
           <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-[11px] leading-relaxed text-muted-foreground">
             <p className="flex items-center gap-1.5 font-medium text-foreground">
-              <KeyRound className="h-3.5 w-3.5" /> Secrets live in environment variables
+              <KeyRound className="h-3.5 w-3.5" /> Two ways to supply gateway keys
             </p>
             <p className="mt-1">
-              Set values in your hosting dashboard or <code>.env.local</code>. Never commit them to
-              source control. If a gateway is enabled without credentials, checkout is blocked with
-              a clear configuration message.
+              Enter them under Platform &rarr; Payment gateways (encrypted at rest with{" "}
+              <code className="font-mono">SECRETS_ENCRYPTION_KEY</code>) or keep them in{" "}
+              <code className="font-mono">.env.local</code>. Stored keys take precedence so you can
+              rotate without a redeploy. Never commit secrets to source control. If a gateway is
+              enabled without credentials, checkout is blocked with a clear configuration message.
             </p>
           </div>
 

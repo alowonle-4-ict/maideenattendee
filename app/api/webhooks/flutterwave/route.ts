@@ -23,7 +23,7 @@ interface FlutterwavePayload {
 
 export async function POST(request: NextRequest) {
   const signature = request.headers.get("verif-hash");
-  if (!isFlutterwaveSignatureValid(signature)) {
+  if (!(await isFlutterwaveSignatureValid(signature))) {
     return NextResponse.json({ status: "error", message: "Invalid signature" }, { status: 401 });
   }
 

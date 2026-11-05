@@ -5,6 +5,11 @@ import { z } from "zod";
 
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  GATEWAY_CREDENTIALS_SETTINGS_KEY,
+  clearGatewayStoredCredentials,
+  saveGatewayCredentialValues,
+} from "@/lib/secrets/gateways";
 import type { ActionState } from "@/lib/actions/admin";
 import type { GatewayName } from "@/lib/payments/types";
 
@@ -378,6 +383,109 @@ export async function setGatewayEnabled(
     ok: true,
     message: `${gateway === "paystack" ? "Paystack" : "Flutterwave"} ${enabled ? "enabled" : "disabled"}.`,
   };
+}
+
+const credentialsSchema = z.object({
+  gateway: z.enum(["paystack", "flutterwave"]),
+  secret_key: z.string().trim().max(400, "Credential is unexpectedly long \u2014 check what you pasted"),
+  secret_hash: z.string().trim().max(400, "Credential is unexpectedly long \u2014 check what you pasted"),
+});
+
+function credentialFieldErrors(
+  gateway: GatewayName,
+  values: { secret_key: string; secret_hash: string }
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (gateway === "paystack") {
+    if (values.secret_key && !/^sk_(test|live)_/.test(values.secret_key)) {
+      errors.secret_key =
+        "A Paystack secret key starts with sk_test_ or sk_live_ (from Keys & Webhooks, not the public keys tab).";
+    }
+  } else {
+    if (values.secret_key && /^FLWPUB/i.test(values.secret_key)) {
+      errors.secret_key = "That looks like the public key. Paste the secret key instead.";
+    }
+    if (values.secret_hash && values.secret_hash.length < 6) {
+      errors.secret_hash = "Enter the verification hash you configured for the Flutterwave webhook.";
+    }
+  }
+  return errors;
+}
+
+export async function saveGatewayCredentials(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  await requirePlatform();
+
+  const gateway = String(formData.get("gateway") ?? "") as GatewayName;
+  if (gateway !== "paystack" && gateway !== "flutterwave") {
+    return { ok: false, message: "Unsupported payment gateway." };
+  }
+
+  const parsed = credentialsSchema.safeParse({
+    gateway,
+    secret_key: (formData.get("secret_key") as string | null) ?? "",
+    secret_hash: (formData.get("secret_hash") as string | null) ?? "",
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Check the credentials.",
+      fieldErrors: Object.fromEntries(
+        parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])
+      ),
+    };
+  }
+
+  const fieldErrors = credentialFieldErrors(gateway, parsed.data);
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, message: "Check the credentials.", fieldErrors };
+  }
+
+  const supplied: Record<string, string> = {};
+  if (parsed.data.secret_key) supplied.secret_key = parsed.data.secret_key;
+  if (parsed.data.secret_hash) supplied.secret_hash = parsed.data.secret_hash;
+
+  if (Object.keys(supplied).length === 0) {
+    return { ok: false, message: "Nothing to save \u2014 every field was left blank." };
+  }
+
+  const result = await saveGatewayCredentialValues(gateway, supplied);
+  if (!result.ok) return { ok: false, message: result.message ?? "Could not save the credentials." };
+
+  await audit("payment_gateway_credentials_updated", "platform_setting", GATEWAY_CREDENTIALS_SETTINGS_KEY, {
+    gateway,
+    fields: Object.keys(supplied),
+    key_prefix: parsed.data.secret_key.slice(0, 8),
+  });
+
+  revalidatePath("/platform/gateways");
+  revalidatePath("/platform/settings");
+  revalidatePath("/admin/billing");
+  revalidatePath("/admin/subscription");
+  return {
+    ok: true,
+    message: `${gateway === "paystack" ? "Paystack" : "Flutterwave"} credentials saved and encrypted on the server.`,
+  };
+}
+
+export async function clearGatewayCredentials(gateway: GatewayName): Promise<ActionState> {
+  await requirePlatform();
+  if (gateway !== "paystack" && gateway !== "flutterwave") {
+    return { ok: false, message: "Unsupported payment gateway." };
+  }
+
+  const result = await clearGatewayStoredCredentials(gateway);
+  if (!result.ok) return result;
+
+  await audit("payment_gateway_credentials_cleared", "platform_setting", GATEWAY_CREDENTIALS_SETTINGS_KEY, {
+    gateway,
+  });
+
+  revalidatePath("/platform/gateways");
+  revalidatePath("/platform/settings");
+  return { ok: true, message: result.message };
 }
 
 const settingsSchema = z.object({

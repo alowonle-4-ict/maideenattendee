@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "crypto";
 
-import { env } from "@/lib/env";
+import { resolveGatewaySecrets } from "@/lib/secrets/gateways";
 import {
   PaymentGatewayError,
   type GatewayPaymentState,
@@ -19,20 +19,26 @@ interface PaystackResponse<T> {
   data: T;
 }
 
-async function paystackRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!env.paystackSecret) {
+async function paystackSecretKey(): Promise<string> {
+  const { paystack } = await resolveGatewaySecrets();
+  if (!paystack.secretKey) {
     throw new PaymentGatewayError(
-      "Paystack is not configured. Set PAYSTACK_SECRET_KEY on the server.",
+      "Paystack is not configured. Add the secret key under Platform \u2192 Payment gateways, or set PAYSTACK_SECRET_KEY on the server.",
       "paystack"
     );
   }
+  return paystack.secretKey;
+}
+
+async function paystackRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const secretKey = await paystackSecretKey();
 
   let response: Response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${env.paystackSecret}`,
+        Authorization: `Bearer ${secretKey}`,
         "Content-Type": "application/json",
         ...(init?.headers ?? {}),
       },
@@ -77,9 +83,11 @@ function mapState(status?: string): GatewayPaymentState {
   }
 }
 
-export function isPaystackSignatureValid(rawBody: string, signature: string | null) {
-  if (!env.paystackSecret || !signature) return false;
-  const expected = createHmac("sha512", env.paystackSecret).update(rawBody).digest("hex");
+export async function isPaystackSignatureValid(rawBody: string, signature: string | null) {
+  if (!signature) return false;
+  const secretKey = await paystackSecretKey().catch(() => null);
+  if (!secretKey) return false;
+  const expected = createHmac("sha512", secretKey).update(rawBody).digest("hex");
   const received = signature.trim().toLowerCase();
   if (expected.length !== received.length) return false;
   try {

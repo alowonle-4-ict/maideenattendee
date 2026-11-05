@@ -1,7 +1,7 @@
 import "server-only";
 
-import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveGatewaySecrets, type ResolvedGatewaySecrets } from "@/lib/secrets/gateways";
 import {
   initializeFlutterwavePayment,
   verifyFlutterwavePayment,
@@ -42,42 +42,46 @@ export async function getGatewayFlags(): Promise<GatewayFlags> {
   }
 }
 
-export function gatewayConfigIssues(gateway: GatewayName): string[] {
+export function gatewayConfigIssues(
+  gateway: GatewayName,
+  secrets: ResolvedGatewaySecrets
+): string[] {
   if (gateway === "paystack") {
-    return env.paystackSecret ? [] : ["PAYSTACK_SECRET_KEY"];
+    return secrets.paystack.secretKey ? [] : ["secret key"];
   }
   const missing: string[] = [];
-  if (!env.flutterwaveSecret) missing.push("FLUTTERWAVE_SECRET_KEY");
-  if (!env.flutterwaveHash) missing.push("FLUTTERWAVE_SECRET_HASH");
+  if (!secrets.flutterwave.secretKey) missing.push("secret key");
+  if (!secrets.flutterwave.secretHash) missing.push("webhook secret hash");
   return missing;
 }
 
 export async function getGatewayAvailability(): Promise<GatewayAvailability[]> {
-  const flags = await getGatewayFlags();
+  const [flags, secrets] = await Promise.all([getGatewayFlags(), resolveGatewaySecrets()]);
   return (["paystack", "flutterwave"] as GatewayName[]).map((gateway) => {
-    const missing = gatewayConfigIssues(gateway);
+    const missing = gatewayConfigIssues(gateway, secrets);
     return {
       gateway,
       label: gateway === "paystack" ? "Paystack" : "Flutterwave",
       configured: missing.length === 0,
       enabled: flags[gateway],
       missing,
+      source: secrets[gateway].source,
     };
   });
 }
 
 export async function assertGatewayAvailable(gateway: GatewayName) {
-  const flags = await getGatewayFlags();
+  const [flags, secrets] = await Promise.all([getGatewayFlags(), resolveGatewaySecrets()]);
   if (!flags[gateway]) {
     throw new PaymentGatewayError(
       `${gateway === "paystack" ? "Paystack" : "Flutterwave"} payments are disabled by the platform administrator.`,
       gateway
     );
   }
-  const missing = gatewayConfigIssues(gateway);
+  const missing = gatewayConfigIssues(gateway, secrets);
   if (missing.length > 0) {
     throw new PaymentGatewayError(
-      `${gateway === "paystack" ? "Paystack" : "Flutterwave"} is not configured. Missing server variables: ${missing.join(", ")}.`,
+      `${gateway === "paystack" ? "Paystack" : "Flutterwave"} is not configured. Add the ${missing.join(" and ")} under Platform \u2192 Payment gateways.`,
       gateway
     );
   }
